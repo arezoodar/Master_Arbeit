@@ -48,9 +48,7 @@ claude_client  = anthropic.Anthropic(api_key="DEIN_ANTHROPIC_KEY")
 python app.py
 ```
 
-Anschließend im Browser öffnen: **http://localhost:5000**
-
----
+Anschließend im Browser öffnen: **[http://localhost:5000**](http://127.0.0.1:5000)---
 
 ## Evaluation ausführen
 
