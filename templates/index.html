@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KI Bildanalyse</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 50px auto; padding: 20px; background: #f5f5f5; }
+        h1 { color: #333; text-align: center; }
+        .upload-box { background: white; border: 2px dashed #ccc; border-radius: 10px; padding: 40px; text-align: center; }
+        input[type="file"] { margin: 20px 0; }
+        .model-select { margin: 15px 0; }
+        .model-select label { margin-right: 15px; font-size: 16px; cursor: pointer; }
+        .buttons { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+        button { color: white; padding: 10px 25px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        .btn-single { background: #4CAF50; }
+        .btn-all { background: #7c3aed; }
+        button:hover { opacity: 0.9; }
+        #preview { max-width: 300px; margin: 20px auto; display: none; }
+        #result { background: white; border-radius: 10px; padding: 20px; margin-top: 20px; display: none; }
+        .item { margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 5px; }
+        .label { font-weight: bold; color: #555; }
+        .recycelbar-ja { color: green; font-weight: bold; }
+        .recycelbar-nein { color: red; font-weight: bold; }
+        .model-badge { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 12px; color: white; margin-left: 10px; }
+        .badge-grok { background: #000000; }
+        .badge-gpt4o { background: #10a37f; }
+        .badge-clip { background: #ff6b35; }
+        .badge-claude { background: #7c3aed; }
+        .zeit { color: #888; font-size: 14px; margin-top: 10px; }
+        #loading { display: none; text-align: center; margin-top: 20px; font-size: 18px; }
+        #comparison { display: none; margin-top: 20px; }
+        .comparison-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
+        .comparison-table th { padding: 12px; text-align: left; color: white; }
+        .comparison-table td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .th-grok { background: #000000; }
+        .th-gpt4o { background: #10a37f; }
+        .th-claude { background: #7c3aed; }
+        .th-clip { background: #ff6b35; }
+        .th-label { background: #555; }
+        .ja { color: green; font-weight: bold; }
+        .nein { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🔍 KI Bildanalyse</h1>
+    <div class="upload-box">
+        <p>Lade ein Bild deines Gegenstands hoch</p>
+        <input type="file" id="imageInput" accept="image/*">
+        <br>
+        <img id="preview" src="" alt="Vorschau">
+        <br>
+        <div class="model-select">
+            <label><input type="radio" name="model" value="llama" checked> ⚫ Llama</label>
+            <label><input type="radio" name="model" value="gpt4o"> 🟢 GPT-4o</label>
+            <label><input type="radio" name="model" value="claude"> 🟣 Claude</label>
+            <label><input type="radio" name="model" value="clip"> 🟠 CLIP</label>
+        </div>
+        <div class="buttons">
+            <button class="btn-single" onclick="analyzeSingle()">🔍 Analysieren</button>
+            <button class="btn-all" onclick="analyzeAll()">⚡ Alle Modelle vergleichen</button>
+        </div>
+    </div>
+    <div id="loading">⏳ Analysiere...</div>
+
+    <div id="result">
+        <h2>Ergebnis <span id="model-badge" class="model-badge"></span></h2>
+        <div class="item"><span class="label">Gegenstand:</span> <span id="objekt"></span></div>
+        <div class="item"><span class="label">Material:</span> <span id="material"></span></div>
+        <div class="item"><span class="label">Zustand:</span> <span id="zustand"></span></div>
+        <div class="item"><span class="label">Recycelbar:</span> <span id="recycelbar"></span></div>
+        <div class="item"><span class="label">Empfehlung:</span> <span id="empfehlung"></span></div>
+        <div class="zeit">⏱ Antwortzeit: <span id="zeit"></span> Sekunden</div>
+    </div>
+
+    <div id="comparison">
+        <h2>⚡ Vergleich aller Modelle</h2>
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th class="th-label"></th>
+                    <th class="th-grok">⚫ Llama</th>
+                    <th class="th-gpt4o">🟢 GPT-4o</th>
+                    <th class="th-claude">🟣 Claude</th>
+                    <th class="th-clip">🟠 CLIP</th>
+                </tr>
+            </thead>
+            <tbody id="comparison-body"></tbody>
+        </table>
+    </div>
+
+    <script>
+        document.getElementById('imageInput').onchange = function() {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var preview = document.getElementById('preview');
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+            }
+            reader.readAsDataURL(this.files[0]);
+        }
+
+        async function analyzeSingle() {
+            var input = document.getElementById('imageInput');
+            if (!input.files[0]) { alert('Bitte ein Bild auswählen!'); return; }
+            var model = document.querySelector('input[name="model"]:checked').value;
+            var formData = new FormData();
+            formData.append('image', input.files[0]);
+            formData.append('model', model);
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('comparison').style.display = 'none';
+            var response = await fetch('/analyze', { method: 'POST', body: formData });
+            var result = await response.json();
+            document.getElementById('objekt').textContent = result.objekt;
+            document.getElementById('material').textContent = result.material;
+            document.getElementById('zustand').textContent = result.zustand;
+            document.getElementById('recycelbar').textContent = result.recycelbar ? 'Ja ♻️' : 'Nein ❌';
+            document.getElementById('recycelbar').className = result.recycelbar ? 'recycelbar-ja' : 'recycelbar-nein';
+            document.getElementById('empfehlung').textContent = result.empfehlung;
+            document.getElementById('zeit').textContent = result.zeit;
+            var badge = document.getElementById('model-badge');
+            if (model === 'grok') { badge.textContent = 'Grok'; badge.className = 'model-badge badge-grok'; }
+            else if (model === 'gpt4o') { badge.textContent = 'GPT-4o'; badge.className = 'model-badge badge-gpt4o'; }
+            else if (model === 'claude') { badge.textContent = 'Claude'; badge.className = 'model-badge badge-claude'; }
+            else { badge.textContent = 'CLIP'; badge.className = 'model-badge badge-clip'; }
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('result').style.display = 'block';
+        }
+
+        async function analyzeAll() {
+            var input = document.getElementById('imageInput');
+            if (!input.files[0]) { alert('Bitte ein Bild auswählen!'); return; }
+            var formData = new FormData();
+            formData.append('image', input.files[0]);
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('comparison').style.display = 'none';
+            var response = await fetch('/analyze_all', { method: 'POST', body: formData });
+            var results = await response.json();
+            var rows = [
+                ['Gegenstand', 'objekt'],
+                ['Material', 'material'],
+                ['Zustand', 'zustand'],
+                ['Recycelbar', 'recycelbar'],
+                ['Empfehlung', 'empfehlung'],
+                ['Antwortzeit', 'zeit']
+            ];
+            var tbody = document.getElementById('comparison-body');
+            tbody.innerHTML = '';
+            rows.forEach(function(row) {
+                var tr = document.createElement('tr');
+                tr.innerHTML = '<td><strong>' + row[0] + '</strong></td>';
+                ['llama', 'gpt4o', 'claude', 'clip'].forEach(function(model) {
+                    var val = results[model] ? results[model][row[1]] : '-';
+                    var td = document.createElement('td');
+                    if (row[1] === 'recycelbar') {
+                        td.innerHTML = val === true ? '<span class="ja">Ja ♻️</span>' : '<span class="nein">Nein ❌</span>';
+                    } else if (row[1] === 'zeit') {
+                        td.textContent = val + 's';
+                    } else {
+                        td.textContent = val;
+                    }
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('comparison').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
